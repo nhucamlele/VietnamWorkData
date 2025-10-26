@@ -60,57 +60,60 @@ def init_uc_driver(headless=False):
 
 
 # ==== CUỘN TRANG (bản chống mất job) ====
-def scroll_to_load_all(driver, base_pause=4, max_scroll=40):
-    last_height = 0
+# ==== CUỘN TRANG (chậm và chắc, dành cho danh sách job) ====
+def scroll_to_load_all(driver, wait, base_pause=10, max_scroll=60):
+    """
+    Cuộn trang chậm để đảm bảo trang VietnamWorks load đầy đủ danh sách job.
+    - base_pause: thời gian chờ giữa các lần cuộn
+    - max_scroll: số lần cuộn tối đa
+    """
+    last_height = driver.execute_script("return document.body.scrollHeight")
     same_count = 0
 
     for i in range(max_scroll):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        print(f"↕️ Cuộn lần {i+1}/{max_scroll} ...")
-        time.sleep(base_pause)
+        print(f"↕️ Cuộn lần {i+1}/{max_scroll} (chờ {base_pause}–{base_pause+5}s)...")
+
+        # Chờ trang load thêm nội dung
+        time.sleep(random.uniform(base_pause, base_pause + 5))
 
         new_height = driver.execute_script("return document.body.scrollHeight")
 
-        # nếu chưa load thêm, thử đợi thêm 3–5 giây
-        if new_height == last_height:
-            print("⏳ Không thấy thay đổi — chờ thêm 4 giây...")
-            time.sleep(4)
-            new_height = driver.execute_script("return document.body.scrollHeight")
-
         if new_height == last_height:
             same_count += 1
-            if same_count >= 4:
-                print("✅ Cuộn hết trang.")
+            print(f"⚠️ Không thấy thay đổi ({same_count}/3)...")
+            if same_count >= 3:
+                print("✅ Cuộn hết trang (không còn nội dung mới).")
                 break
         else:
             same_count = 0
             last_height = new_height
 
+        # Cho JS thêm thời gian render nội dung mới
+        time.sleep(random.uniform(3, 6))
+
+    # Sau khi cuộn xong, đảm bảo phần tử đã xuất hiện đầy đủ
+    try:
+        wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")))
+        time.sleep(5)
+    except:
+        print("⚠️ Timeout khi chờ load đủ danh sách job.")
+    print("🕐 Cuộn hoàn tất, chuẩn bị lấy danh sách job...")
 
 
-# ==== LẤY DANH SÁCH JOB URL ====
+# ==== LẤY DANH SÁCH JOB URL (dành cho trang listing) ====
 def get_job_links(driver, wait, start_url, limit=9999):
     driver.get(start_url)
-    time.sleep(4)
+    print("🌐 Đang mở trang đầu, chờ load danh sách job...")
+    time.sleep(10)
 
-    for i in range(60):
-        try:
-            view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-f2fa3706-0.hXfuhm")
-            driver.execute_script("arguments[0].scrollIntoView(true);", view_more_btn)
-            time.sleep(random.uniform(1.2, 2))
-            driver.execute_script("arguments[0].click();", view_more_btn)
-            print(f"🟩 Click 'View more' lần {i+1}")
-            time.sleep(random.uniform(2.5, 3.5))
-        except:
-            print("🚫 Hết nút View more hoặc lỗi click.")
-            break
+    # Cuộn để load toàn bộ danh sách
+    scroll_to_load_all(driver, wait, base_pause=10, max_scroll=50)
+    time.sleep(8)
 
-    scroll_to_load_all(driver)
-    time.sleep(5)  # đảm bảo load hết
-    wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")))
-
+    # Thu thập link job
     job_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")
-    print(f"✅ Tổng cộng {len(job_blocks)} job tìm thấy.")
+    print(f"✅ Tổng cộng {len(job_blocks)} job tìm thấy sau khi load hoàn tất.")
 
     job_urls = []
     for i, block in enumerate(job_blocks[:limit], start=1):
@@ -124,7 +127,9 @@ def get_job_links(driver, wait, start_url, limit=9999):
                 print(f"{i}. 🔗 {job_url}")
         except:
             print(f"{i}. ⚠️ Không tìm thấy link job.")
+
     return job_urls
+
 
 
 # ==== LẤY THÔNG TIN JOB ====
@@ -276,8 +281,8 @@ def main():
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
 
     try:
-        for page in range(1, 2):
-            time.sleep(random.uniform(5, 10))
+        for page in range(1, 3):
+            time.sleep(random.uniform(7, 10))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
             print(f"🌐 ĐANG CÀO TRANG {page}: {page_url}")
