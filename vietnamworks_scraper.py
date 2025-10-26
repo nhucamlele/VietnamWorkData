@@ -60,28 +60,32 @@ def init_uc_driver(headless=False):
 
 
 # ==== CUỘN TRANG (bản chống mất job) ====
-def scroll_to_load_all(driver, pause=6, max_scroll=60):
-    """
-    Cuộn hết trang để load toàn bộ job.
-    Dừng khi 3 lần liên tiếp không có thêm nội dung mới.
-    """
+def scroll_to_load_all(driver, base_pause=4, max_scroll=40):
     last_height = 0
     same_count = 0
 
     for i in range(max_scroll):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         print(f"↕️ Cuộn lần {i+1}/{max_scroll} ...")
-        time.sleep(random.uniform(pause, pause + 1))
+        time.sleep(base_pause)
+
         new_height = driver.execute_script("return document.body.scrollHeight")
+
+        # nếu chưa load thêm, thử đợi thêm 3–5 giây
+        if new_height == last_height:
+            print("⏳ Không thấy thay đổi — chờ thêm 4 giây...")
+            time.sleep(4)
+            new_height = driver.execute_script("return document.body.scrollHeight")
 
         if new_height == last_height:
             same_count += 1
-            if same_count >= 6:
-                print("✅ Cuộn hết trang (xác nhận 3 lần).")
+            if same_count >= 4:
+                print("✅ Cuộn hết trang.")
                 break
         else:
             same_count = 0
             last_height = new_height
+
 
 
 # ==== LẤY DANH SÁCH JOB URL ====
@@ -272,7 +276,7 @@ def main():
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
 
     try:
-        for page in range(5, 9):
+        for page in range(1, 2):
             time.sleep(random.uniform(5, 10))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
