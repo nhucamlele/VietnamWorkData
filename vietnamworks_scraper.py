@@ -60,7 +60,7 @@ def init_uc_driver(headless=False):
 
 
 # ==== CUỘN TRANG (bản chống mất job) ====
-def scroll_to_load_all(driver, pause=3, max_scroll=60):
+def scroll_to_load_all(driver, pause=6, max_scroll=60):
     """
     Cuộn hết trang để load toàn bộ job.
     Dừng khi 3 lần liên tiếp không có thêm nội dung mới.
@@ -76,7 +76,7 @@ def scroll_to_load_all(driver, pause=3, max_scroll=60):
 
         if new_height == last_height:
             same_count += 1
-            if same_count >= 3:
+            if same_count >= 6:
                 print("✅ Cuộn hết trang (xác nhận 3 lần).")
                 break
         else:
@@ -89,7 +89,7 @@ def get_job_links(driver, wait, start_url, limit=9999):
     driver.get(start_url)
     time.sleep(4)
 
-    for i in range(30):
+    for i in range(60):
         try:
             view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-f2fa3706-0.hXfuhm")
             driver.execute_script("arguments[0].scrollIntoView(true);", view_more_btn)
@@ -272,8 +272,8 @@ def main():
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
 
     try:
-        for page in range(5, 7):
-            time.sleep(random.uniform(5, 9))
+        for page in range(5, 9):
+            time.sleep(random.uniform(5, 10))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
             print(f"🌐 ĐANG CÀO TRANG {page}: {page_url}")
