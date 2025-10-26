@@ -72,7 +72,7 @@ def init_uc_driver(headless=False):
     return driver, wait
 
 # ==== CUỘN TRANG ====
-def scroll_to_load_all(driver, pause=7, max_scroll=80):
+def scroll_to_load_all(driver, pause=7, max_scroll=30):
     last_height = 0
     same_height_count = 0
     for i in range(max_scroll):
@@ -92,23 +92,37 @@ def scroll_to_load_all(driver, pause=7, max_scroll=80):
 
 # ==== LẤY DANH SÁCH JOB URL ====
 def get_job_links(driver, wait, start_url, limit=9999):
+    """Vào trang list, cuộn chậm chậm để load hết job rồi lấy URL."""
     driver.get(start_url)
-    time.sleep(4)
-    for i in range(30):
-        try:
-            view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-f2fa3706-0.hXfuhm")
-            driver.execute_script("arguments[0].scrollIntoView(true);", view_more_btn)
-            time.sleep(random.uniform(1.2, 2))
-            driver.execute_script("arguments[0].click();", view_more_btn)
-            print(f"🟩 Click 'View more' lần {i+1}")
-            time.sleep(random.uniform(2.5, 3.5))
-        except:
+    time.sleep(7)
+    print(f"🌐 Đang load danh sách job từ: {start_url}")
+
+    seen_count = 0
+    stagnant_rounds = 0
+    total_rounds = 0
+
+    while True:
+        total_rounds += 1
+        driver.execute_script("window.scrollBy(0, 1000);")
+        time.sleep(random.uniform(1.5, 3.5))
+        # kiểm tra số lượng job hiện tại
+        job_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")
+        current_count = len(job_blocks)
+        print(f"🌀 Lần cuộn {total_rounds}: hiện có {current_count} job hiển thị")
+
+        if current_count == seen_count:
+            stagnant_rounds += 1
+        else:
+            stagnant_rounds = 0
+            seen_count = current_count
+
+        # nếu không thay đổi sau 5 lần => coi như load hết
+        if stagnant_rounds >= 5 or total_rounds >= 80:
+            print("✅ Không thấy job mới, dừng cuộn.")
             break
-    scroll_to_load_all(driver)
-    time.sleep(5)
-    wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")))
-    job_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")
-    print(f"✅ Tổng cộng {len(job_blocks)} job tìm thấy.")
+
+    print(f"🏁 Hoàn tất load danh sách ({seen_count} job).")
+
     job_urls = []
     for i, block in enumerate(job_blocks[:limit], start=1):
         try:
@@ -121,19 +135,21 @@ def get_job_links(driver, wait, start_url, limit=9999):
                 print(f"{i}. 🔗 {job_url}")
         except:
             print(f"{i}. ⚠️ Không tìm thấy link job.")
+    print(f"✅ Tổng cộng {len(job_urls)} link hợp lệ được thu thập.")
     return job_urls
+
 
 # ==== LẤY THÔNG TIN JOB ====
 def get_job_info(driver, job_url):
     driver.get(job_url)
-    time.sleep(random.uniform(2, 4))
+    time.sleep(random.uniform(3, 9))
     job_name = salary = None
     location = posted_time = skills = working_days = working_type = job_domain = None
     company_url = None
     try:
         view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-bd699a4b-0.eOtpMH")
         driver.execute_script("arguments[0].click();", view_more_btn)
-        time.sleep(1.5)
+        time.sleep(5)
     except:
         pass
     try: job_name = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
@@ -229,7 +245,7 @@ def main():
     else:
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
     try:
-        for page in range(1, 3):
+        for page in range(1, 10):
             time.sleep(random.uniform(5, 9))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
