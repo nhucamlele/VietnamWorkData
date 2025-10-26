@@ -8,12 +8,24 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-
 # ==== CONFIG ====
 START_URL = "https://www.vietnamworks.com/it-kw"
 BASE_URL = "https://www.vietnamworks.com"
 JSON_PATH = "vietnamworks_it_filtered.json"
 
+# ==== DANH SÁCH TRÌNH DUYỆT / USER AGENT ==== 
+CHROME_OPTIONS_LIST = [
+    "--disable-blink-features=AutomationControlled",
+    "--no-sandbox",
+    "--disable-gpu",
+    "--incognito",
+]
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.179 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:116.0) Gecko/20100101 Firefox/116.0",
+]
 
 # ==== HÀM LƯU / CẬP NHẬT FILE JSON ====
 def save_or_update_json(new_data, file_path=JSON_PATH):
@@ -45,76 +57,58 @@ def save_or_update_json(new_data, file_path=JSON_PATH):
 
     print(f"💾 Đã cập nhật {file_path}: tổng {len(updated)} job.")
 
-
-# ==== KHỞI TẠO DRIVER ====
+# ==== KHỞI TẠO DRIVER VỚI RANDOM USER AGENT ====
 def init_uc_driver(headless=False):
     options = uc.ChromeOptions()
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-gpu")
+    for opt in CHROME_OPTIONS_LIST:
+        options.add_argument(opt)
+    options.add_argument(f"user-agent={random.choice(USER_AGENTS)}")
+    if headless is None:
+        headless = random.choice([True, False])
     if headless:
         options.add_argument("--headless=new")
     driver = uc.Chrome(options=options)
     wait = WebDriverWait(driver, 20)
     return driver, wait
 
-
-# ==== CUỘN TRANG (bản chống mất job) ====
-# ==== CUỘN TRANG (chậm và chắc, dành cho danh sách job) ====
-def scroll_to_load_all(driver, wait, base_pause=10, max_scroll=60):
-    """
-    Cuộn trang chậm để đảm bảo trang VietnamWorks load đầy đủ danh sách job.
-    - base_pause: thời gian chờ giữa các lần cuộn
-    - max_scroll: số lần cuộn tối đa
-    """
-    last_height = driver.execute_script("return document.body.scrollHeight")
-    same_count = 0
-
+# ==== CUỘN TRANG ====
+def scroll_to_load_all(driver, pause=7, max_scroll=80):
+    last_height = 0
+    same_height_count = 0
     for i in range(max_scroll):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        print(f"↕️ Cuộn lần {i+1}/{max_scroll} (chờ {base_pause}–{base_pause+5}s)...")
-
-        # Chờ trang load thêm nội dung
-        time.sleep(random.uniform(base_pause, base_pause + 5))
-
+        print(f"🌀 Cuộn lần {i+1}/{max_scroll} ...")
+        time.sleep(random.uniform(pause, pause+3))
         new_height = driver.execute_script("return document.body.scrollHeight")
-
         if new_height == last_height:
-            same_count += 1
-            print(f"⚠️ Không thấy thay đổi ({same_count}/3)...")
-            if same_count >= 3:
-                print("✅ Cuộn hết trang (không còn nội dung mới).")
+            same_height_count += 1
+            if same_height_count >= 3:
+                print("✅ Có vẻ đã load hết nội dung. Dừng cuộn.")
                 break
         else:
-            same_count = 0
+            same_height_count = 0
             last_height = new_height
+    print("🏁 Đã hoàn tất cuộn toàn bộ trang.")
 
-        # Cho JS thêm thời gian render nội dung mới
-        time.sleep(random.uniform(3, 6))
-
-    # Sau khi cuộn xong, đảm bảo phần tử đã xuất hiện đầy đủ
-    try:
-        wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")))
-        time.sleep(5)
-    except:
-        print("⚠️ Timeout khi chờ load đủ danh sách job.")
-    print("🕐 Cuộn hoàn tất, chuẩn bị lấy danh sách job...")
-
-
-# ==== LẤY DANH SÁCH JOB URL (dành cho trang listing) ====
+# ==== LẤY DANH SÁCH JOB URL ====
 def get_job_links(driver, wait, start_url, limit=9999):
     driver.get(start_url)
-    print("🌐 Đang mở trang đầu, chờ load danh sách job...")
-    time.sleep(10)
-
-    # Cuộn để load toàn bộ danh sách
-    scroll_to_load_all(driver, wait, base_pause=10, max_scroll=50)
-    time.sleep(8)
-
-    # Thu thập link job
+    time.sleep(4)
+    for i in range(30):
+        try:
+            view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-f2fa3706-0.hXfuhm")
+            driver.execute_script("arguments[0].scrollIntoView(true);", view_more_btn)
+            time.sleep(random.uniform(1.2, 2))
+            driver.execute_script("arguments[0].click();", view_more_btn)
+            print(f"🟩 Click 'View more' lần {i+1}")
+            time.sleep(random.uniform(2.5, 3.5))
+        except:
+            break
+    scroll_to_load_all(driver)
+    time.sleep(5)
+    wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")))
     job_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")
-    print(f"✅ Tổng cộng {len(job_blocks)} job tìm thấy sau khi load hoàn tất.")
-
+    print(f"✅ Tổng cộng {len(job_blocks)} job tìm thấy.")
     job_urls = []
     for i, block in enumerate(job_blocks[:limit], start=1):
         try:
@@ -127,84 +121,53 @@ def get_job_links(driver, wait, start_url, limit=9999):
                 print(f"{i}. 🔗 {job_url}")
         except:
             print(f"{i}. ⚠️ Không tìm thấy link job.")
-
     return job_urls
-
-
 
 # ==== LẤY THÔNG TIN JOB ====
 def get_job_info(driver, job_url):
     driver.get(job_url)
     time.sleep(random.uniform(2, 4))
-
     job_name = salary = None
     location = posted_time = skills = working_days = working_type = job_domain = None
     company_url = None
-
     try:
         view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-bd699a4b-0.eOtpMH")
         driver.execute_script("arguments[0].click();", view_more_btn)
         time.sleep(1.5)
     except:
         pass
-
-    try:
-        job_name = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
-    except:
-        pass
-
-    try:
-        salary = driver.find_element(By.CSS_SELECTOR, "span.sc-ab270149-0.cVbwLK").text.strip()
-    except:
-        pass
-
+    try: job_name = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
+    except: pass
+    try: salary = driver.find_element(By.CSS_SELECTOR, "span.sc-ab270149-0.cVbwLK").text.strip()
+    except: pass
     try:
         company_a = driver.find_element(By.CSS_SELECTOR, "div.sc-37577279-3.drWnZq a.sc-ab270149-0.egZKeY")
         company_url = company_a.get_attribute("href")
-    except:
-        pass
-
+    except: pass
     try:
         location_header = driver.find_element(By.XPATH, "//h2[contains(text(), 'Job Locations')]")
         parent = location_header.find_element(By.XPATH, "./..")
         loc_elems = parent.find_elements(By.CSS_SELECTOR, "p.sc-ab270149-0")
         locations = [loc.text.strip() for loc in loc_elems if loc.text.strip()]
-        if locations:
-            location = ". ".join(locations)
-    except:
-        pass
-
+        if locations: location = ". ".join(locations)
+    except: pass
     try:
         info_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-7bf5461f-1.jseBPO div")
         for block in info_blocks:
             try:
                 label = block.find_element(By.CSS_SELECTOR, "label.sc-ab270149-0.dfyRSX").text.strip().upper()
                 value = None
-                try:
-                    value = block.find_element(By.CSS_SELECTOR, "p.sc-ab270149-0").text.strip()
-                except:
-                    pass
-                if not value:
-                    continue
-
-                if "POSTED DATE" in label:
-                    posted_time = value
-                elif "SKILL" in label:
-                    skills = value
-                elif "WORKING DAYS" in label:
-                    working_days = value
-                elif "WORKING TYPE" in label:
-                    working_type = value
-                elif "JOB FUNCTION" in label:
-                    job_domain = value
-            except:
-                continue
-    except Exception as e:
-        print("⚠️ Không tìm thấy block info:", e)
-
-    if not working_type:
-        working_type = "At office"
-
+                try: value = block.find_element(By.CSS_SELECTOR, "p.sc-ab270149-0").text.strip()
+                except: pass
+                if not value: continue
+                if "POSTED DATE" in label: posted_time = value
+                elif "SKILL" in label: skills = value
+                elif "WORKING DAYS" in label: working_days = value
+                elif "WORKING TYPE" in label: working_type = value
+                elif "JOB FUNCTION" in label: job_domain = value
+            except: continue
+    except Exception as e: print("⚠️ Không tìm thấy block info:", e)
+    if not working_type: working_type = "At office"
     return {
         "Job_name": job_name,
         "Location": location,
@@ -217,21 +180,17 @@ def get_job_info(driver, job_url):
         "Company_url": company_url
     }
 
-
 # ==== LẤY THÔNG TIN COMPANY ====
 def get_company_info(driver, company_url):
     driver.get(company_url)
     time.sleep(random.uniform(2, 4))
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
     time.sleep(2)
-
     company_name = company_size = company_address = company_industry = None
     try:
         name_el = driver.find_element(By.CSS_SELECTOR, "div.sc-ca95509a-6.cXJgQF h1.sc-ca95509a-8.gcvyPj")
         company_name = name_el.text.strip()
-    except:
-        pass
-
+    except: pass
     try:
         lis = driver.find_elements(By.CSS_SELECTOR, "ul.sc-7f4c261d-5.kfIkVN li.sc-7f4c261d-6.ejuuLs")
         for li in lis:
@@ -243,18 +202,11 @@ def get_company_info(driver, company_url):
                     value = li.find_element(By.CSS_SELECTOR, "div.text div.dangerously-text").text.strip()
                 else:
                     continue
-
-                if "size" in label:
-                    company_size = value
-                elif "address" in label:
-                    company_address = value
-                elif "industry" in label:
-                    company_industry = value
-            except:
-                continue
-    except:
-        pass
-
+                if "size" in label: company_size = value
+                elif "address" in label: company_address = value
+                elif "industry" in label: company_industry = value
+            except: continue
+    except: pass
     return {
         "Company": company_name,
         "Company size": company_size,
@@ -262,12 +214,10 @@ def get_company_info(driver, company_url):
         "Company industry": company_industry
     }
 
-
 # ==== MAIN ====
 def main():
-    driver, wait = init_uc_driver(headless=False)
+    driver, wait = init_uc_driver(headless=None)
     results = []
-
     old_urls = set()
     if os.path.exists(JSON_PATH):
         with open(JSON_PATH, "r", encoding="utf-8") as f:
@@ -275,37 +225,29 @@ def main():
                 old_data = json.load(f)
                 old_urls = {item.get("Url") for item in old_data if isinstance(item, dict) and item.get("Url")}
                 print(f"📂 Đã tải {len(old_urls)} job cũ.")
-            except Exception:
-                print("⚠️ File cũ lỗi định dạng, bỏ qua.")
+            except Exception: print("⚠️ File cũ lỗi định dạng, bỏ qua.")
     else:
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
-
     try:
         for page in range(1, 3):
-            time.sleep(random.uniform(7, 10))
+            time.sleep(random.uniform(5, 9))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
             print(f"🌐 ĐANG CÀO TRANG {page}: {page_url}")
             print(f"==============================")
-
             job_urls = get_job_links(driver, wait, page_url, limit=9999)
-
             for idx, job_url in enumerate(job_urls, start=1):
                 if job_url in old_urls:
                     print("⛔ Gặp job cũ, dừng cào.")
                     break
-
                 print(f"\n{idx}. 🔍 Cào job detail: {job_url}")
                 job_info = get_job_info(driver, job_url)
-
                 if not job_info.get("Company_url"):
                     print("⚠️ Bỏ qua job này vì không có Company URL.")
                     continue
-
                 company_url = job_info["Company_url"]
                 print(f"🏢 Cào company: {company_url}")
                 company_info = get_company_info(driver, company_url)
-
                 results.append({
                     "Url": job_url,
                     "Job name": job_info.get("Job_name"),
@@ -319,13 +261,10 @@ def main():
                     "Company size": company_info.get("Company size"),
                     "Working days": job_info.get("Working_days")
                 })
-
         print(f"\n🎯 Tổng số job mới cào được: {len(results)}")
         save_or_update_json(results, JSON_PATH)
-
     finally:
         driver.quit()
-
     # ==== TỰ ĐỘNG GỬI LÊN GITHUB ====
     print("\n🚀 Đang cập nhật GitHub...")
     subprocess.run(["git", "add", JSON_PATH])
@@ -333,7 +272,6 @@ def main():
     subprocess.run(["git", "commit", "-m", "auto update VietnamWorks data and scraper"])
     subprocess.run(["git", "push", "origin", "main"])
     print("✅ Hoàn tất cập nhật GitHub.")
-
 
 if __name__ == "__main__":
     main()
