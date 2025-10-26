@@ -2,6 +2,7 @@ import time
 import json
 import random
 import os
+import subprocess
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -16,17 +17,10 @@ JSON_PATH = "vietnamworks_it_filtered.json"
 
 # ==== HÀM LƯU / CẬP NHẬT FILE JSON ====
 def save_or_update_json(new_data, file_path=JSON_PATH):
-    """
-    Gộp dữ liệu mới vào file JSON hiện có:
-    - Đọc file cũ (nếu có)
-    - Loại job trùng theo 'Url'
-    - Thêm job mới lên đầu
-    - Ghi đè file duy nhất
-    """
-    # Đọc dữ liệu cũ
+    """Gộp dữ liệu mới vào file JSON hiện có."""
     if os.path.exists(file_path):
         try:
-            with open(r"C:\Users\LENOVO\OneDrive\Tài liệu\CAP2\vietnamworks_it_filtered.json", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 old_data = json.load(f)
                 if not isinstance(old_data, list):
                     old_data = []
@@ -36,10 +30,7 @@ def save_or_update_json(new_data, file_path=JSON_PATH):
     else:
         old_data = []
 
-    # Tập URL cũ
     old_urls = {item.get("Url") for item in old_data if isinstance(item, dict) and item.get("Url")}
-
-    # Lọc job mới
     fresh_data = [job for job in new_data if job.get("Url") not in old_urls]
 
     if not fresh_data:
@@ -47,11 +38,8 @@ def save_or_update_json(new_data, file_path=JSON_PATH):
         return
 
     print(f"🆕 Phát hiện {len(fresh_data)} job mới → thêm lên đầu file cũ...")
-
-    # Gộp dữ liệu (mới ở đầu)
     updated = fresh_data + old_data
 
-    # Ghi file
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(updated, f, ensure_ascii=False, indent=2)
 
@@ -71,22 +59,33 @@ def init_uc_driver(headless=False):
     return driver, wait
 
 
-# ==== HÀM CUỘN TRANG ====
-def scroll_to_load_all(driver, pause=4.5, max_scroll=45):
-    last_height = driver.execute_script("return document.body.scrollHeight")
+# ==== CUỘN TRANG (bản chống mất job) ====
+def scroll_to_load_all(driver, pause=3, max_scroll=60):
+    """
+    Cuộn hết trang để load toàn bộ job.
+    Dừng khi 3 lần liên tiếp không có thêm nội dung mới.
+    """
+    last_height = 0
+    same_count = 0
+
     for i in range(max_scroll):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        print(f"↕️ Đang cuộn lần {i+1}/{max_scroll} ...")
-        time.sleep(pause)
+        print(f"↕️ Cuộn lần {i+1}/{max_scroll} ...")
+        time.sleep(random.uniform(pause, pause + 1))
         new_height = driver.execute_script("return document.body.scrollHeight")
+
         if new_height == last_height:
-            print("✅ Cuộn hết trang.")
-            break
-        last_height = new_height
+            same_count += 1
+            if same_count >= 3:
+                print("✅ Cuộn hết trang (xác nhận 3 lần).")
+                break
+        else:
+            same_count = 0
+            last_height = new_height
 
 
 # ==== LẤY DANH SÁCH JOB URL ====
-def get_job_links(driver, wait, start_url, limit=10):
+def get_job_links(driver, wait, start_url, limit=9999):
     driver.get(start_url)
     time.sleep(4)
 
@@ -103,7 +102,9 @@ def get_job_links(driver, wait, start_url, limit=10):
             break
 
     scroll_to_load_all(driver)
+    time.sleep(5)  # đảm bảo load hết
     wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")))
+
     job_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-eEbqID.jZzXhN")
     print(f"✅ Tổng cộng {len(job_blocks)} job tìm thấy.")
 
@@ -119,7 +120,6 @@ def get_job_links(driver, wait, start_url, limit=10):
                 print(f"{i}. 🔗 {job_url}")
         except:
             print(f"{i}. ⚠️ Không tìm thấy link job.")
-            continue
     return job_urls
 
 
@@ -259,7 +259,6 @@ def main():
     driver, wait = init_uc_driver(headless=False)
     results = []
 
-    # 🟩 Đọc dữ liệu cũ nếu có để biết khi nào dừng
     old_urls = set()
     if os.path.exists(JSON_PATH):
         with open(JSON_PATH, "r", encoding="utf-8") as f:
@@ -274,6 +273,7 @@ def main():
 
     try:
         for page in range(3, 6):
+            time.sleep(random.uniform(5, 9))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
             print(f"🌐 ĐANG CÀO TRANG {page}: {page_url}")
@@ -282,9 +282,8 @@ def main():
             job_urls = get_job_links(driver, wait, page_url, limit=9999)
 
             for idx, job_url in enumerate(job_urls, start=1):
-                # ⛔ Dừng khi gặp job cũ
                 if job_url in old_urls:
-                    print("⛔ Gặp job cũ, dừng cào (đã cập nhật đủ job mới).")
+                    print("⛔ Gặp job cũ, dừng cào.")
                     break
 
                 print(f"\n{idx}. 🔍 Cào job detail: {job_url}")
@@ -318,11 +317,14 @@ def main():
     finally:
         driver.quit()
 
+    # ==== TỰ ĐỘNG GỬI LÊN GITHUB ====
+    print("\n🚀 Đang cập nhật GitHub...")
+    subprocess.run(["git", "add", JSON_PATH])
+    subprocess.run(["git", "add", "vietnamworks_scraper.py"])
+    subprocess.run(["git", "commit", "-m", "auto update VietnamWorks data and scraper"])
+    subprocess.run(["git", "push", "origin", "main"])
+    print("✅ Hoàn tất cập nhật GitHub.")
+
 
 if __name__ == "__main__":
     main()
-import subprocess
-
-subprocess.run(["git", "add", "vietnamworks_it_filtered.json"])
-subprocess.run(["git", "commit", "-m", "auto update VietnamWorks data"])
-subprocess.run(["git", "push", "origin", "main"])
