@@ -272,7 +272,7 @@ def main():
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
 
     try:
-        for page in range(3, 6):
+        for page in range(5, 7):
             time.sleep(random.uniform(5, 9))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
