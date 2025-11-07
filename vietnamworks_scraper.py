@@ -212,7 +212,7 @@ def main():
             old_data = json.load(f)
             old_urls = {item.get("Url") for item in old_data if isinstance(item, dict)}
 
-    for page in range(10, 20):
+    for page in range(20, 40):
         page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
         print(f"\n==============================")
         print(f"🌐 ĐANG CÀO TRANG {page}")
