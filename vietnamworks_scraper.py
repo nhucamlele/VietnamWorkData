@@ -145,12 +145,50 @@ def get_job_info(driver, job_url):
     driver.get(job_url)
     time.sleep(random.uniform(2, 4))
 
-    job_name = salary = location = posted_time = skills = job_domain = None
+    job_name = salary = None
+    location = posted_time = skills = job_domain = None
     company_url = None
 
     try:
-        job_name = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
+        view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-bd699a4b-0.eOtpMH")
+        driver.execute_script("arguments[0].click();", view_more_btn)
+        time.sleep(2)
+    except:
+        pass
+
+    try: job_name = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
     except: pass
+    try: salary = driver.find_element(By.CSS_SELECTOR, "span.sc-ab270149-0.cVbwLK").text.strip()
+    except: pass
+    try:
+        company_a = driver.find_element(By.CSS_SELECTOR, "div.sc-37577279-3.drWnZq a.sc-ab270149-0.egZKeY")
+        company_url = company_a.get_attribute("href")
+    except: pass
+
+    try:
+        location_header = driver.find_element(By.XPATH, "//h2[contains(text(), 'Job Locations')]")
+        parent = location_header.find_element(By.XPATH, "./..")
+        loc_elems = parent.find_elements(By.CSS_SELECTOR, "p.sc-ab270149-0")
+        locations = [loc.text.strip() for loc in loc_elems if loc.text.strip()]
+        if locations: location = ". ".join(locations)
+    except: pass
+
+    try:
+        info_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-7bf5461f-1.jseBPO div")
+        for block in info_blocks:
+            try:
+                label = block.find_element(By.CSS_SELECTOR, "label.sc-ab270149-0.dfyRSX").text.strip().upper()
+                value = None
+                try: value = block.find_element(By.CSS_SELECTOR, "p.sc-ab270149-0").text.strip()
+                except: pass
+                if not value: continue
+                if "POSTED DATE" in label: posted_time = value
+                elif "SKILL" in label: skills = value
+                elif "JOB FUNCTION" in label: job_domain = value
+            except:
+                continue
+    except:
+        pass
 
     try:
         salary = driver.find_element(By.CSS_SELECTOR, "span.sc-ab270149-0.cVbwLK").text.strip()
