@@ -56,7 +56,6 @@ def save_or_update_json(new_data, file_path=JSON_PATH):
 
 # ==== KHỞI TẠO DRIVER AN TOÀN ====
 def init_uc_driver(headless=False, retries=3):
-    """Khởi tạo undetected_chromedriver an toàn, retry nếu crash."""
     for attempt in range(1, retries + 1):
         try:
             options = uc.ChromeOptions()
@@ -64,7 +63,7 @@ def init_uc_driver(headless=False, retries=3):
                 options.add_argument(opt)
             options.add_argument(f"user-agent={random.choice(USER_AGENTS)}")
             if headless:
-                options.add_argument("--headless")  # không dùng --headless=new
+                options.add_argument("--headless")
             driver = uc.Chrome(options=options)
             driver.maximize_window()
             wait = WebDriverWait(driver, 20)
@@ -89,6 +88,7 @@ def get_job_links(driver, wait, start_url, limit=9999):
     driver = ensure_driver_alive(driver)
     driver.get(start_url)
     time.sleep(7)
+
     print(f"🌐 Đang load danh sách job từ: {start_url}")
 
     seen_count = 0
@@ -127,6 +127,7 @@ def get_job_links(driver, wait, start_url, limit=9999):
                 print(f"{i}. 🔗 {job_url}")
         except:
             print(f"{i}. ⚠️ Không tìm thấy link job.")
+
     print(f"✅ Tổng cộng {len(job_urls)} link hợp lệ được thu thập.")
     return job_urls
 
@@ -150,7 +151,8 @@ def get_job_info(driver, job_url):
         view_more_btn = driver.find_element(By.CSS_SELECTOR, "button.sc-bd699a4b-0.eOtpMH")
         driver.execute_script("arguments[0].click();", view_more_btn)
         time.sleep(2)
-    except: pass
+    except:
+        pass
 
     try: job_name = driver.find_element(By.CSS_SELECTOR, "h1").text.strip()
     except: pass
@@ -160,6 +162,7 @@ def get_job_info(driver, job_url):
         company_a = driver.find_element(By.CSS_SELECTOR, "div.sc-37577279-3.drWnZq a.sc-ab270149-0.egZKeY")
         company_url = company_a.get_attribute("href")
     except: pass
+
     try:
         location_header = driver.find_element(By.XPATH, "//h2[contains(text(), 'Job Locations')]")
         parent = location_header.find_element(By.XPATH, "./..")
@@ -167,6 +170,7 @@ def get_job_info(driver, job_url):
         locations = [loc.text.strip() for loc in loc_elems if loc.text.strip()]
         if locations: location = ". ".join(locations)
     except: pass
+
     try:
         info_blocks = driver.find_elements(By.CSS_SELECTOR, "div.sc-7bf5461f-1.jseBPO div")
         for block in info_blocks:
@@ -179,8 +183,10 @@ def get_job_info(driver, job_url):
                 if "POSTED DATE" in label: posted_time = value
                 elif "SKILL" in label: skills = value
                 elif "JOB FUNCTION" in label: job_domain = value
-            except: continue
-    except Exception as e: print("⚠️ Không tìm thấy block info:", e)
+            except:
+                continue
+    except:
+        pass
 
     return {
         "Job_name": job_name,
@@ -207,6 +213,7 @@ def get_company_info(driver, company_url):
         name_el = driver.find_element(By.CSS_SELECTOR, "div.sc-ca95509a-6.cXJgQF h1.sc-ca95509a-8.gcvyPj")
         company_name = name_el.text.strip()
     except: pass
+
     try:
         lis = driver.find_elements(By.CSS_SELECTOR, "ul.sc-7f4c261d-5.kfIkVN li.sc-7f4c261d-6.ejuuLs")
         for li in lis:
@@ -220,11 +227,13 @@ def get_company_info(driver, company_url):
                 if "size" in label: company_size = value
                 elif "address" in label: company_address = value
                 elif "industry" in label: company_industry = value
-            except: continue
-    except: pass
+            except:
+                continue
+    except:
+        pass
 
     if not company_size:
-        return None  # loại job
+        return None
 
     return {
         "Company": company_name,
@@ -244,9 +253,11 @@ def main():
                 old_data = json.load(f)
                 old_urls = {item.get("Url") for item in old_data if isinstance(item, dict) and item.get("Url")}
                 print(f"📂 Đã tải {len(old_urls)} job cũ.")
-            except Exception: print("⚠️ File cũ lỗi định dạng, bỏ qua.")
+            except Exception:
+                print("⚠️ File cũ lỗi định dạng, bỏ qua.")
     else:
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
+
     try:
         for page in range(1, 3):
             time.sleep(random.uniform(5, 9))
@@ -254,7 +265,9 @@ def main():
             print(f"\n==============================")
             print(f"🌐 ĐANG CÀO TRANG {page}: {page_url}")
             print(f"==============================")
+
             job_urls = get_job_links(driver, wait, page_url, limit=9999)
+
             for idx, job_url in enumerate(job_urls, start=1):
                 if job_url in old_urls:
                     print("⏭️ Job đã tồn tại, bỏ qua:", job_url)
@@ -275,7 +288,7 @@ def main():
                     "Url": job_url,
                     "Job name": job_info.get("Job_name"),
                     "Company Name": company_info.get("Company"),
-                    "Address": job_info.get("Location"),
+                    "Address": company_info.get("Address"),  # ✅ SỬA ĐÚNG ĐỊA CHỈ CÔNG TY
                     "Company type": job_info.get("Working_type"),
                     "Time": job_info.get("Posted_time"),
                     "Skills": job_info.get("Skills"),
@@ -287,10 +300,10 @@ def main():
 
         print(f"\n🎯 Tổng số job mới cào được: {len(results)}")
         save_or_update_json(results, JSON_PATH)
+
     finally:
         driver.quit()
 
-    # ==== GitHub auto push ====
     print("\n🚀 Đang cập nhật GitHub...")
     try:
         subprocess.run(["git", "-C", os.getcwd(), "add", JSON_PATH])
