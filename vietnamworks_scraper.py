@@ -254,7 +254,7 @@ def main():
     try:
         for page in range(1, 3):
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
-            print(f"\n🌐 ĐANG CÀO TRANG: {page_url}")
+            print(f"\n🌐 ĐANG CÀO TRANG: {page}")
             job_list = get_job_links(driver, wait, page_url)
 
             for idx, (job_url, location) in enumerate(job_list, start=1):
