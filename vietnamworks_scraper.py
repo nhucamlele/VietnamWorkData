@@ -216,7 +216,7 @@ def get_company_info(driver, company_url):
                 if "size" in label or "industry" in label:
                     value = li.find_element(By.CSS_SELECTOR, "p.text").text.strip()
                 elif "address" in label:
-                    value = li.find_element(By.CSS_SELECTOR, "div.text div.dangerously-text").text.strip()
+                    value = li.find_element(By.CSS_SELECTOR, "span.sc-fTyFcS.fWdnij").text.strip()
                 if "size" in label: company_size = value
                 elif "address" in label: company_address = value
                 elif "industry" in label: company_industry = value
@@ -248,7 +248,7 @@ def main():
     else:
         print("🆕 Không có file cũ, sẽ cào toàn bộ.")
     try:
-        for page in range(3, 5):
+        for page in range(1, 3):
             time.sleep(random.uniform(5, 9))
             page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
             print(f"\n==============================")
