@@ -212,8 +212,11 @@ def main():
             old_data = json.load(f)
             old_urls = {item.get("Url") for item in old_data if isinstance(item, dict)}
 
-    for page in range(1, 3):
+    for page in range(1, 10):
         page_url = f"https://www.vietnamworks.com/jobs?q=it&page={page}&sorting=relevant"
+        print(f"\n==============================")
+        print(f"🌐 ĐANG CÀO TRANG {page}")
+        print(f"==============================")
         job_list = get_job_links(driver, wait, page_url)
 
         for job_url, location in job_list:
